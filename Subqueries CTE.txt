@@ -102,3 +102,183 @@ where
 	and bp_systolic < (select max(bp_systolic) from vitals)
 	
 	
+...
+
+select *
+from patients
+where master_patient_id in (
+select distinct master_Patient_id from surgical_encounters
+)
+order by master_patient_id
+
+...
+
+select distinct p.master_patient_id
+from patients p
+inner join surgical_encounters s 
+on p.master_patient_id = s.master_patient_id
+order by p.master_patient_id
+
+...
+
+
+select *
+from surgical_encounters
+where total_profit > all(
+select avg(total_cost)
+from surgical_encounters
+group by diagnosis_description
+)
+
+...
+
+
+select 
+	diagnosis_description,
+	avg(surgical_discharge_date - surgical_admission_date) as length_of_stay
+	from surgical_encounters
+	group by diagnosis_description
+	having avg(surgical_discharge_date - surgical_admission_date) <=
+	all(
+	select
+		avg(extract(day from patient_discharge_datetime - patient_admission_datetime))
+	from encounters
+	group by department_id)
+	
+...
+
+
+select 
+	unit_name,
+	string_agg(distinct surgical_type, ',') as case_types
+	from surgical_encounters
+	group by unit_name
+	having string_agg(distinct surgical_type, ',') like all(
+		select string_agg(distinct surgical_type, ',')
+		from surgical_encounters
+	)
+
+...
+
+select e.*
+from encounters e
+where exists(
+select 1
+from orders_procedures o
+where e.patient_encounter_id = o.patient_encounter_id)
+
+...
+
+select p.*
+from patients p
+where not exists(
+select 1
+from surgical_encounters s
+where s.master_patient_id = p.master_patient_id)
+
+....
+
+WITH RECURSIVE fibonacci AS (
+SELECT 1 AS a, 1 AS b
+UNION ALL
+SELECT b, a+b
+FROM fibonacci
+)
+SELECT a, b
+FROM fibonacci
+LIMIT 10
+
+...
+
+with recursive orders as (
+select
+order_procedure_id,
+order_parent_order_id, 0 as level
+from orders_procedures
+where order_parent_order_id is null
+union all
+select
+	op.order_procedure_id,
+	op.order_parent_order_id,
+	o.level + 1 as level
+from
+orders_procedures op
+inner join orders o on op.order_parent_order_id = o.order_procedure_id
+)
+select *
+from orders
+	
+
+...
+
+with provider_encounters as (
+select
+ordering_provider_id,
+patient_encounter_id,
+count(order_procedure_id) as num_procedures
+	from orders_procedures
+	group by ordering_provider_id, patient_encounter_id),
+	provider_orders as (
+	select
+	ordering_provider_id,
+	avg(num_procedures) as avg_num_procedures
+	from provider_encounters
+	group by ordering_provider_id)
+	select
+	p.full_name,
+	o.avg_num_procedures
+	from physicians p
+	left outer join provider_orders o
+	on p.id = o.ordering_provider_id
+	where o.avg_num_procedures is not null
+	order by o.avg_num_procedures desc
+	
+	
+...
+
+select distinct patient_encounter_id
+from orders_procedures
+where order_cd in (
+select order_cd
+from orders_procedures
+group by order_cd
+order by count(*) desc
+	limit 10
+	)
+	
+...
+
+select a.*
+from accounts a
+where
+total_account_balance > 10000 and exists(
+select 1
+	from encounters e
+	where e.hospital_account_id = a.account_id and patient_in_icu_flag = 'Yes'
+)
+
+....
+
+with old_los as (
+	select extract(year from age(now(), p.date_of_birth)) as age,
+			avg(s.surgical_discharge_date - s.surgical_admission_date) as avg_los
+	from patients p
+	inner join surgical_encounters s
+	on p.master_patient_id = s.master_patient_id
+	
+	where p.date_of_birth is not null
+	and extract(year from age(now(), p.date_of_birth)) >= 65
+group by extract(year from age(now(), P.DATE_OF_BIRTH))
+)
+select e.*
+from encounters e
+inner join patients p
+on e.master_patient_id = p.master_patient_id
+and p.date_of_birth >= '1995-01-01'
+where
+extract(days from (e.patient_discharge_datetime - e.patient_admission_datetime))
+>= all(
+select avg_los
+	from old_los
+)
+
