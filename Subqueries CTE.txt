@@ -1,0 +1,104 @@
+SET  search_path TO general_hospital;
+select se.*
+from(
+	select *
+	from surgical_encounters
+	where surgical_admission_date 
+		between '2016-11-01' and '2016-11-30'
+	) se
+inner join (
+select master_patient_id
+from patients
+where date_of_birth >= '1990-01-01') p on se.master_patient_id = p.master_patient_id;
+...
+
+with young_patients as (
+	select * 
+	from patients
+	where date_of_birth >= '2000-01-01'
+)
+select *
+from young_patients
+where name ilike 'm%';
+
+....
+
+SET  search_path TO general_hospital;
+
+with top_counties as (
+select county,
+	count(*) as num_patients
+from patients
+group by county
+	having count(*) > 1500
+),
+county_patients as (
+select 
+		p.master_patient_id,
+		p.county
+	from patients p
+	inner join top_counties t on
+	p.county = t.county
+	
+	)
+	select 
+		p.county,
+		count(s.surgery_id) as num_surgeries
+	from surgical_encounters s
+	inner join county_patients p on
+	s.master_patient_id = p.master_patient_id
+	group by p.county;
+	
+	...
+
+SET  search_path TO general_hospital;
+
+with top_counties as (
+select county,
+	count(*) as num_patients
+from patients
+group by county
+	having count(*) > 1500
+),
+county_patients as (
+select 
+		p.master_patient_id,
+		p.county
+	from patients p
+	inner join top_counties t on
+	p.county = t.county
+	
+	)
+	select 
+		p.county,
+		count(s.surgery_id) as num_surgeries
+	from surgical_encounters s
+	inner join county_patients p on
+	s.master_patient_id = p.master_patient_id
+	group by p.county;
+	
+
+
+with total_cost as (
+	select surgery_id,
+	sum(resource_cost) as total_surgery_cost
+	from surgical_costs
+	group by surgery_id
+	)
+select *
+from total_cost
+where total_surgery_cost > (
+select avg(total_surgery_cost)
+	from total_cost
+)
+	
+	
+...
+
+select *
+from vitals
+where
+	bp_diastolic > (select min(bp_diastolic) from vitals)
+	and bp_systolic < (select max(bp_systolic) from vitals)
+	
+	
